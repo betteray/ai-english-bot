@@ -81,7 +81,7 @@ class TranslationService:
                 # 更新消息，显示翻译结果
                 await query.edit_message_text(
                     text=translation,
-                    parse_mode='Markdown'
+                    parse_mode='HTML'
                 )
             except Exception as e:
                 logger.error(f"翻译失败 - {word}: {str(e)}")

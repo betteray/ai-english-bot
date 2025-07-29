@@ -82,29 +82,50 @@ class ECDictService:
         
         lines = []
         
-        # 单词
+        # 单词标题
         word = word_data.get('word', '')
-        lines.append(f"📖 **{word}**")
+        lines.append(f"<b>📖 {word}</b>")
         
         # 音标
         phonetic = word_data.get('phonetic', '')
         if phonetic:
-            lines.append(f"🔊 /{phonetic}/")
+            lines.append(f"<i>🔊 /{phonetic}/</i>")
+        
+        lines.append("")  # 空行分隔
         
         # 中文释义
         translation = word_data.get('translation', '')
         if translation:
-            lines.append(f"🇨🇳 {translation}")
+            lines.append("<b>🇨🇳 中文释义</b>")
+            # 处理多行释义
+            for line in translation.split('\n'):
+                if line.strip():
+                    lines.append(f"  • {line.strip()}")
+            lines.append("")
         
         # 英文释义
         definition = word_data.get('definition', '')
         if definition:
-            lines.append(f"🇬🇧 {definition}")
+            lines.append("<b>🇬🇧 英文释义</b>")
+            for line in definition.split('\n'):
+                if line.strip():
+                    lines.append(f"  • {line.strip()}")
+            lines.append("")
         
         # 词性
         pos = word_data.get('pos', '')
         if pos:
-            lines.append(f"📝 词性: {pos}")
+            lines.append(f"<b>📝 词性:</b> <code>{pos}</code>")
+            lines.append("")
+        
+        # 词形变化
+        exchange = word_data.get('exchange', '')
+        if exchange:
+            exchange_info = self._format_exchange(exchange)
+            if exchange_info:
+                lines.append("<b>🔄 词形变化</b>")
+                lines.append(f"  {exchange_info}")
+                lines.append("")
         
         # 词频和等级信息
         collins = word_data.get('collins', 0)
@@ -114,16 +135,18 @@ class ECDictService:
         
         level_info = []
         if collins and collins > 0:
-            level_info.append(f"柯林斯: {collins}星")
+            level_info.append(f"柯林斯 <b>{collins}星</b>")
         if oxford and oxford > 0:
-            level_info.append("牛津3000")
+            level_info.append("<b>牛津3000</b>")
         if bnc and str(bnc) != '0':
-            level_info.append(f"BNC词频: {bnc}")
+            level_info.append(f"BNC词频: <code>{bnc}</code>")
         if frq and str(frq) != '0':
-            level_info.append(f"现代词频: {frq}")
+            level_info.append(f"现代词频: <code>{frq}</code>")
         
         if level_info:
-            lines.append(f"⭐ {' | '.join(level_info)}")
+            lines.append("<b>⭐ 权威评级</b>")
+            lines.append(f"  {' | '.join(level_info)}")
+            lines.append("")
         
         # 考试标签
         tag = word_data.get('tag', '')
@@ -136,16 +159,10 @@ class ECDictService:
             tags = []
             for t in tag.split():
                 if t in tag_mapping:
-                    tags.append(tag_mapping[t])
+                    tags.append(f"<code>{tag_mapping[t]}</code>")
             if tags:
-                lines.append(f"🎯 考试范围: {' | '.join(tags)}")
-        
-        # 词形变化
-        exchange = word_data.get('exchange', '')
-        if exchange:
-            exchange_info = self._format_exchange(exchange)
-            if exchange_info:
-                lines.append(f"🔄 {exchange_info}")
+                lines.append("<b>🎯 考试范围</b>")
+                lines.append(f"  {' | '.join(tags)}")
         
         return '\n'.join(lines)
     
@@ -172,9 +189,9 @@ class ECDictService:
             for key in ['p', 'd', 'i', '3', 'r', 't', 's', '0']:
                 if key in exchanges:
                     name = exchange_names.get(key, key)
-                    formatted.append(f"{name}: {exchanges[key]}")
+                    formatted.append(f"<b>{name}:</b> <code>{exchanges[key]}</code>")
             
-            return ', '.join(formatted) if formatted else ""
+            return ' | '.join(formatted) if formatted else ""
         except Exception as e:
             logger.error(f"格式化词形变化失败: {e}")
             return ""
