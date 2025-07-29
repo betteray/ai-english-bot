@@ -2,12 +2,13 @@
 Telegram Bot 主类 - 简化版
 """
 import asyncio
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from loguru import logger
 
 from .handlers.commands import (
     start_command, word_command, auto_start_command, 
-    auto_stop_command, stats_command, wordlist_command
+    auto_stop_command, stats_command, wordlist_command,
+    upload_command, my_wordlists_command, handle_document
 )
 from .handlers.callbacks import translation_callback, wordlist_callback
 
@@ -34,13 +35,20 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("auto_stop", auto_stop_command))
         self.application.add_handler(CommandHandler("stats", stats_command))
         self.application.add_handler(CommandHandler("wordlist", wordlist_command))
+        self.application.add_handler(CommandHandler("upload", upload_command))
+        self.application.add_handler(CommandHandler("my_wordlists", my_wordlists_command))
+        
+        # 注册文档处理器
+        self.application.add_handler(
+            MessageHandler(filters.Document.ALL, handle_document)
+        )
         
         # 注册回调处理器
         self.application.add_handler(
             CallbackQueryHandler(translation_callback, pattern=r"translate_.*")
         )
         self.application.add_handler(
-            CallbackQueryHandler(wordlist_callback, pattern=r"(select_wordlist_.*|refresh_wordlist)")
+            CallbackQueryHandler(wordlist_callback, pattern=r"(select_wordlist_.*|refresh_wordlist|my_wordlists|separator|delete_wordlist_.*|confirm_delete_.*|cancel_delete)")
         )
         
         logger.info("机器人初始化完成")

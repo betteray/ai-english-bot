@@ -74,29 +74,67 @@ class WordService:
             await update.message.reply_text("❌ 没有找到可用的单词表文件。")
             return
         
-        # 创建单词表选择按钮 - 按名称排序
+        # 创建单词表选择按钮 - 按类型和名称排序
         keyboard = []
-        # 按单词表名称排序
-        sorted_wordlists = sorted(available_wordlists.items(), key=lambda x: x[1]['display_name'])
         
-        for wordlist_name, wordlist_info in sorted_wordlists:
+        # 分别处理系统单词表和用户单词表
+        system_wordlists = []
+        user_wordlists = []
+        
+        for wordlist_name, wordlist_info in available_wordlists.items():
+            if wordlist_info['type'] == 'system':
+                system_wordlists.append((wordlist_name, wordlist_info))
+            else:
+                user_wordlists.append((wordlist_name, wordlist_info))
+        
+        # 按名称排序
+        system_wordlists.sort(key=lambda x: x[1]['display_name'])
+        user_wordlists.sort(key=lambda x: x[1]['display_name'])
+        
+        # 添加系统单词表
+        for wordlist_name, wordlist_info in system_wordlists:
             prefix = "✅ " if wordlist_name == current_wordlist_name else "📚 "
-            button_text = f"{prefix}{wordlist_info['display_name']}"
+            button_text = f"{prefix}{wordlist_info['display_name']} ({wordlist_info['word_count']}词)"
             keyboard.append([InlineKeyboardButton(
                 button_text, 
                 callback_data=f"select_wordlist_{wordlist_name}"
             )])
         
-        # 添加刷新按钮
-        keyboard.append([InlineKeyboardButton("🔄 刷新列表", callback_data="refresh_wordlist")])
+        # 添加分隔线（如果有用户单词表）
+        if user_wordlists:
+            keyboard.append([InlineKeyboardButton("━━━ 📁 我的单词表 ━━━", callback_data="separator")])
+        
+        # 添加用户单词表
+        for wordlist_name, wordlist_info in user_wordlists:
+            prefix = "✅ " if wordlist_name == current_wordlist_name else ""
+            button_text = f"{prefix}{wordlist_info['display_name']} ({wordlist_info['word_count']}词)"
+            keyboard.append([InlineKeyboardButton(
+                button_text, 
+                callback_data=f"select_wordlist_{wordlist_name}"
+            )])
+        
+        # 添加功能按钮
+        keyboard.append([
+            InlineKeyboardButton("🔄 刷新列表", callback_data="refresh_wordlist"),
+            InlineKeyboardButton("📁 我的单词表", callback_data="my_wordlists")
+        ])
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
+        message_text = (
+            "📚 <b>选择单词表</b>\n\n"
+            "✅ 当前使用的单词表\n"
+            "📚 系统默认单词表\n"
+            "📁 用户上传的单词表\n\n"
+            "💡 <b>提示：</b>\n"
+            "• 发送 /upload 上传自定义单词表\n"
+            "• 发送 /my_wordlists 管理我的单词表"
+        )
+        
         await update.message.reply_text(
-            "📚 请选择要使用的单词表：\n\n"
-            "✅ 表示当前选择的单词表\n"
-            "📚 表示可选择的单词表",
-            reply_markup=reply_markup
+            message_text,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
         )
     
     @staticmethod
