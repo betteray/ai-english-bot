@@ -1,0 +1,3 @@
+[submodule "data/ecdict"]
+	path = data/ecdict
+	url = https://github.com/skywind3000/ECDICT.git
