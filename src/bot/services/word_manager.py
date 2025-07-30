@@ -64,7 +64,11 @@ class WordManager:
             parts = filename[:-4].split('_', 2)  # 分割成最多3部分
             if len(parts) >= 3:
                 original_filename = parts[2]  # 第三部分是原始文件名
-                display_name = self._generate_display_name_from_filename(original_filename + '.txt')
+                # 特殊处理查询单词表
+                if original_filename == "query":
+                    display_name = "我的查询单词表"
+                else:
+                    display_name = self._generate_display_name_from_filename(original_filename + '.txt')
             else:
                 # 如果格式不符合预期，使用完整文件名
                 display_name = self._generate_display_name_from_filename(filename)
@@ -309,6 +313,85 @@ class WordManager:
                         'filename': filename
                     })
         return user_wordlists
+
+    def create_user_query_wordlist(self, chat_id: int) -> dict:
+        """创建用户查询单词表"""
+        from ..models.database import db_manager
+        
+        # 获取用户查询的单词
+        query_words = db_manager.get_user_query_words(chat_id)
+        
+        if not query_words:
+            return {
+                'success': False,
+                'error': '您还没有查询过任何单词，请先发送一些英文单词给我'
+            }
+        
+        try:
+            # 创建单词表内容
+            words_content = []
+            for word_data in query_words:
+                words_content.append(word_data['word'])
+            
+            # 去重并排序
+            unique_words = sorted(list(set(words_content)))
+            content = ', '.join(unique_words)
+            
+            # 生成文件名 - 使用更短的名称避免callback_data过长
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"query_{timestamp}.txt"  # 简化文件名
+            final_filename = f"{chat_id}_{timestamp}_query.txt"
+            file_path = os.path.join(self.user_wordlists_dir, final_filename)
+            
+            # 保存文件
+            with open(file_path, 'w', encoding='utf-8') as file:
+                file.write(content)
+            
+            # 验证文件内容并计算单词数量
+            word_count = len(unique_words)
+            
+            # 重新扫描单词表
+            self.available_wordlists = self.scan_wordlists()
+            
+            logger.info(f"用户 {chat_id} 创建查询单词表成功: {final_filename} ({word_count} 个单词)")
+            
+            return {
+                'success': True,
+                'filename': final_filename,
+                'display_name': f"📝 我的查询单词表",
+                'word_count': word_count,
+                'wordlist_key': f"user_{final_filename[:-4]}"
+            }
+            
+        except Exception as e:
+            logger.error(f"创建用户查询单词表失败: {e}")
+            return {
+                'success': False,
+                'error': f'创建单词表失败: {str(e)}'
+            }
+
+    def get_user_query_wordlist_info(self, chat_id: int) -> dict:
+        """获取用户查询单词表信息"""
+        from ..models.database import db_manager
+        
+        # 查找是否已存在查询单词表（新格式：{chat_id}_{timestamp}_query.txt）
+        query_wordlist_key = None
+        for key, info in self.available_wordlists.items():
+            if info['type'] == 'user':
+                filename = os.path.basename(info['full_path'])
+                if filename.startswith(f"{chat_id}_") and filename.endswith("_query.txt"):
+                    query_wordlist_key = key
+                    break
+        
+        # 获取用户查询单词数量
+        query_words_count = db_manager.get_user_query_words_count(chat_id)
+        
+        return {
+            'exists': query_wordlist_key is not None,
+            'wordlist_key': query_wordlist_key,
+            'query_words_count': query_words_count,
+            'wordlist_info': self.available_wordlists.get(query_wordlist_key) if query_wordlist_key else None
+        }
 
 
 # 创建全局实例

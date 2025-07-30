@@ -41,12 +41,20 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         f"   • 总学习单词：{user_stats['total_words']} 个\n"
         f"   • 今日学习：{user_stats['today_words']} 个\n"
         f"   • 已翻译：{user_stats['translated_words']} 个\n\n"
+        "🎯 <b>学习功能：</b>\n"
         "📖 发送 /word 开始学习单词\n"
+        "💬 直接发送英文单词给我，获取翻译\n"
+        "📋 发送 /my_words 查看查询记录\n\n"
+        "📚 <b>单词表管理：</b>\n"
         "📚 发送 /wordlist 选择单词表\n"
         "📁 发送 /upload 上传自定义单词表\n"
-        "⚙️ 发送 /auto_start 开启自动发送\n"
+        "🗂️ 发送 /my_wordlists 管理我的单词表\n\n"
+        "⚙️ <b>自动功能：</b>\n"
+        "▶️ 发送 /auto_start 开启自动发送\n"
         "⏹️ 发送 /auto_stop 关闭自动发送\n"
-        "📊 发送 /stats 查看详细统计"
+        "📊 发送 /stats 查看详细统计\n\n"
+        "💡 <b>提示：</b>直接发送英文单词给我，我会翻译并记录，您可以用这些单词创建专属的学习单词表！",
+        parse_mode='HTML'
     )
 
 
@@ -179,6 +187,75 @@ async def my_wordlists_command(update: Update, context: ContextTypes.DEFAULT_TYP
         '\n'.join(message_lines),
         parse_mode='HTML',
         reply_markup=reply_markup
+    )
+
+
+async def my_words_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """处理 /my_words 命令 - 显示用户查询的单词记录"""
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    
+    # 更新用户活动
+    db_manager.add_or_update_user(
+        chat_id=chat_id,
+        username=user.username,
+        first_name=user.first_name,
+        last_name=user.last_name
+    )
+    
+    # 获取用户查询的单词
+    query_words = db_manager.get_user_query_words(chat_id, limit=20)
+    
+    if not query_words:
+        await update.message.reply_text(
+            "📋 <b>您的查询记录</b>\n\n"
+            "暂无查询记录\n\n"
+            "💡 发送英文单词给我，我会为您翻译并记录\n"
+            "💡 发送 /help 查看更多使用方法",
+            parse_mode='HTML'
+        )
+        return
+    
+    # 构建查询记录消息
+    message_lines = ["📋 <b>您的查询记录</b>\n"]
+    
+    for i, word_data in enumerate(query_words[:15], 1):
+        word = word_data['word']
+        message_lines.append(f"{i}. <code>{word}</code>")
+    
+    if len(query_words) > 15:
+        message_lines.append(f"\n... 还有 {len(query_words) - 15} 个单词")
+    
+    total_count = db_manager.get_user_query_words_count(chat_id)
+    message_lines.append(f"\n📊 总计查询了 {total_count} 个不同的单词")
+    
+    # 检查是否已有查询单词表
+    query_info = word_manager.get_user_query_wordlist_info(chat_id)
+    
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    keyboard = []
+    
+    if query_info['query_words_count'] > 0:
+        if not query_info['exists']:
+            keyboard.append([InlineKeyboardButton(
+                "📝 创建我的单词表", 
+                callback_data="create_query_wordlist"
+            )])
+        else:
+            wordlist_info = query_info['wordlist_info']
+            keyboard.append([InlineKeyboardButton(
+                f"📚 切换到我的单词表 ({wordlist_info['word_count']}词)", 
+                callback_data=f"select_wordlist_{query_info['wordlist_key']}"
+            )])
+    
+    keyboard.append([InlineKeyboardButton("🗑️ 清空记录", callback_data="clear_query_words")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+    
+    await update.message.reply_text(
+        '\n'.join(message_lines),
+        reply_markup=reply_markup,
+        parse_mode='HTML'
     )
 
 

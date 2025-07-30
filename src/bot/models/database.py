@@ -76,10 +76,24 @@ class DatabaseManager:
                 )
             ''')
             
+            # 创建用户查询单词表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS user_query_words (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    chat_id INTEGER,
+                    word TEXT NOT NULL,
+                    translation TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (chat_id) REFERENCES users (chat_id)
+                )
+            ''')
+            
             # 创建索引
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_word_history_chat_id ON word_history(chat_id)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_word_history_created_at ON word_history(created_at)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_last_activity ON users(last_activity)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_query_words_chat_id ON user_query_words(chat_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_query_words_created_at ON user_query_words(created_at)')
             
             conn.commit()
             logger.success("数据库初始化完成")
@@ -366,6 +380,91 @@ class DatabaseManager:
         finally:
             conn.close()
 
+    def add_user_query_word(self, chat_id: int, word: str, translation: str) -> bool:
+        """添加用户查询的单词"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                INSERT INTO user_query_words (chat_id, word, translation)
+                VALUES (?, ?, ?)
+            ''', (chat_id, word.lower(), translation))
+            
+            conn.commit()
+            return True
+            
+        except Exception as e:
+            logger.error(f"添加用户查询单词失败: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
 
+    def get_user_query_words(self, chat_id: int, limit: int = 100) -> List[dict]:
+        """获取用户查询的单词列表"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                SELECT DISTINCT word, translation, created_at 
+                FROM user_query_words 
+                WHERE chat_id = ? 
+                ORDER BY created_at DESC
+                LIMIT ?
+            ''', (chat_id, limit))
+            
+            results = cursor.fetchall()
+            return [
+                {
+                    'word': row[0],
+                    'translation': row[1],
+                    'created_at': row[2]
+                }
+                for row in results
+            ]
+            
+        except Exception as e:
+            logger.error(f"获取用户查询单词失败: {e}")
+            return []
+        finally:
+            conn.close()
+
+    def get_user_query_words_count(self, chat_id: int) -> int:
+        """获取用户查询单词的数量"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                SELECT COUNT(DISTINCT word) FROM user_query_words WHERE chat_id = ?
+            ''', (chat_id,))
+            
+            result = cursor.fetchone()
+            return result[0] if result else 0
+            
+        except Exception as e:
+            logger.error(f"获取用户查询单词数量失败: {e}")
+            return 0
+        finally:
+            conn.close()
+
+    def clear_user_query_words(self, chat_id: int) -> bool:
+        """清空用户查询的单词"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('DELETE FROM user_query_words WHERE chat_id = ?', (chat_id,))
+            conn.commit()
+            return True
+            
+        except Exception as e:
+            logger.error(f"清空用户查询单词失败: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
 # 创建全局数据库管理器实例
 db_manager = DatabaseManager()
