@@ -3,6 +3,7 @@
 """
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from loguru import logger
+import os
 
 from .word_manager import word_manager
 from ..models.database import db_manager
@@ -84,8 +85,11 @@ class WordService:
         for wordlist_name, wordlist_info in available_wordlists.items():
             if wordlist_info['type'] == 'system':
                 system_wordlists.append((wordlist_name, wordlist_info))
-            else:
-                user_wordlists.append((wordlist_name, wordlist_info))
+            elif wordlist_info['type'] == 'user':
+                # 只显示当前用户自己的单词表
+                filename = os.path.basename(wordlist_info['full_path'])
+                if filename.startswith(f"{chat_id}_"):
+                    user_wordlists.append((wordlist_name, wordlist_info))
         
         # 按名称排序
         system_wordlists.sort(key=lambda x: x[1]['display_name'])
