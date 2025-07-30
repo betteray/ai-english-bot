@@ -109,7 +109,7 @@ class SchedulerService:
         try:
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"📝 学习时间到！\n\n{word}",
+                text=word,
                 reply_markup=reply_markup
             )
             
